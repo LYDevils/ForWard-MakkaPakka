@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "欧美风向标|口碑与热度",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "聚合烂番茄(口碑)与流媒体平台(热度)，高精度抓取无Emoji纯净版。",
-    version: "1.1.3", // 🚀 升级：引入高精度时间过滤，防同名老剧误抓
+    version: "1.1.4", // 🚀 升级：针对各平台重写精准表格索引，新增海报强制校验防抓错
     requiredVersion: "0.0.1",
     site: "https://t.me/MakkaPakkaOvO",
 
@@ -148,8 +148,10 @@ async function searchTmdb(rtItem, rank) {
         const res = await Widget.tmdb.get(`/search/${rtItem.mediaType}`, {
             params: { query: cleanTitle, language: "zh-CN", page: 1 }
         });
-        const match = (res.results || [])[0];
-        if (!match) return null;
+        
+        // 🌟 强力校验：必须有海报才算是正常的剧
+        const match = (res.results || []).find(item => item.poster_path);
+        if (!match) return null; // 搜不到或者没有海报直接丢弃
 
         let scores = [];
         if (rtItem.tomatoScore) scores.push(`新鲜度 ${rtItem.tomatoScore}%`);
@@ -185,18 +187,28 @@ async function fetchFlixPatrolData(platform, region, mediaType) {
 
         const $ = Widget.html.load(html);
         const tables = $('.card-table tbody');
+        if (tables.length === 0) return [];
         
-        let targetTable = null;
-        if (mediaType === "all") {
-            targetTable = tables.length >= 3 ? tables.eq(2) : tables.eq(0);
-        } else if (mediaType === "movie") {
-            targetTable = tables.eq(0);
-        } else if (mediaType === "tv") {
-            targetTable = tables.length >= 2 ? tables.eq(1) : tables.eq(0);
+        // 🌟 核心修复点：针对不同平台的专属表格索引逻辑
+        let tableIndex = 0;
+        if (platform === "disney") {
+            // Disney+: [0] All, [1] Movie, [2] TV
+            tableIndex = mediaType === "all" ? 0 : (mediaType === "movie" ? 1 : 2);
+        } else if (platform === "hbo") {
+            // HBO: [0] Movie, [1] TV (无综合榜单)
+            // 如果用户选了"综合"，为了防崩溃，默认退回到 TV 榜单
+            tableIndex = mediaType === "movie" ? 0 : 1;
+        } else {
+            // Netflix, Apple, Amazon: [0] Movie, [1] TV, [2] All
+            tableIndex = mediaType === "movie" ? 0 : (mediaType === "tv" ? 1 : 2);
         }
 
-        if (!targetTable) return [];
+        // 安全防越界：如果该平台某天突然少了表格，取它能拿到的最后一个
+        if (tableIndex >= tables.length) {
+            tableIndex = tables.length - 1;
+        }
 
+        const targetTable = tables.eq(tableIndex);
         const titles = [];
         targetTable.find('tr').each((i, el) => {
             if (i >= 10) return; // 取 Top 10
@@ -229,15 +241,16 @@ async function searchTmdbFP(title, mediaType, rank) {
         
         if (results.length === 0) return null;
 
-        // 🌟 新增核心：时间智能过滤逻辑
         const now = Date.now();
         const oneYearAgo = now - (365 * 24 * 60 * 60 * 1000); // 电影近一年
         const sixMonthsAgo = now - (180 * 24 * 60 * 60 * 1000); // 剧集近半年
 
         let bestMatch = null;
 
-        // 只遍历前5个匹配结果，避免老剧重名抓错
+        // 🌟 新增海报强校验：循环时，只看带海报的结果
         for (let item of results.slice(0, 5)) {
+            if (!item.poster_path) continue; // 没海报直接 pass，看下一个
+
             const itemType = item.media_type || (mediaType === "all" ? "movie" : mediaType);
             
             if (itemType === "movie") {
@@ -249,8 +262,6 @@ async function searchTmdbFP(title, mediaType, rank) {
                     }
                 }
             } else if (itemType === "tv") {
-                // 剧集需要特殊处理：搜索接口只提供 first_air_date，会误杀老剧新更
-                // 获取该剧的最新更新日期进行校验
                 try {
                     const detail = await Widget.tmdb.get(`/tv/${item.id}`, { params: { language: "zh-CN" } });
                     const lastAirDate = detail.last_air_date || item.first_air_date;
@@ -262,7 +273,6 @@ async function searchTmdbFP(title, mediaType, rank) {
                         }
                     }
                 } catch (e) {
-                    // 如果详情获取失败，按首播时间粗略判断兜底
                     if (item.first_air_date) {
                         const airTime = new Date(item.first_air_date).getTime();
                         if (airTime >= sixMonthsAgo) {
@@ -274,12 +284,14 @@ async function searchTmdbFP(title, mediaType, rank) {
             }
         }
 
-        // 🛡️ 兜底保护：如果前5个都没有近期上线的（说明上榜的真的是经典老剧如《老友记》）
-        // 则退回原逻辑：直接选取匹配度最高的第一条，防止榜单缺口
+        // 🛡️ 兜底保护：如果时间不匹配，找第一个【带有海报】的。
         if (!bestMatch) {
-            bestMatch = results[0];
+            bestMatch = results.find(item => item.poster_path);
         }
         
+        // 🚀 终极丢弃：如果连带海报的兜底都没有，说明这是野鸡名字，果断丢弃！
+        if (!bestMatch) return null; 
+
         const actualMediaType = bestMatch.media_type || (mediaType === "all" ? "movie" : mediaType);
         return buildItem(bestMatch, actualMediaType, { rank: rank });
         
@@ -302,7 +314,10 @@ async function fetchTmdbFallback(platform, region, mediaType) {
                 page: 1
             }
         });
-        return (res.results || []).slice(0, 10).map((item, i) => buildItem(item, tmdbMediaType, { rank: i + 1 }));
+        
+        // 确保兜底结果也有海报
+        const validResults = (res.results || []).filter(item => item.poster_path);
+        return validResults.slice(0, 10).map((item, i) => buildItem(item, tmdbMediaType, { rank: i + 1 }));
     } catch (e) { return []; }
 }
 
@@ -340,6 +355,7 @@ function buildItem(item, mediaType, { rank, customSub } = {}) {
         releaseDate: dateStr, 
         subTitle: "", 
         
+        // 因为我们在上方已经过滤了无海报项，这里基本保证非空，但保留容错
         posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "",
         backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "",
         
