@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "欧美风向标|口碑与热度",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "聚合烂番茄(口碑)与流媒体平台(热度)，高精度抓取无Emoji纯净版。",
-    version: "1.1.4", // 🚀 升级：针对各平台重写精准表格索引，新增海报强制校验防抓错
+    version: "1.1.5", // 🚀 修复：烂番茄前端大改版导致失效的问题，引入“逆向DOM树遍历”防封杀解析
     requiredVersion: "0.0.1",
     site: "https://t.me/MakkaPakkaOvO",
 
@@ -106,7 +106,7 @@ async function loadWesternTrends(params = {}) {
 }
 
 // =========================================================================
-// 2. 烂番茄逻辑 (口碑榜)
+// 2. 烂番茄逻辑 (高容错逆向遍历解析)
 // =========================================================================
 
 async function loadRottenTomatoes(listType, page) {
@@ -123,22 +123,69 @@ async function loadRottenTomatoes(listType, page) {
 async function fetchRottenTomatoesList(type) {
     const url = RT_URLS[type] || RT_URLS["rt_movies_home"];
     try {
-        const res = await Widget.http.get(url, { headers: { "User-Agent": "Mozilla/5.0" } });
-        const $ = Widget.html.load(res.data || "");
-        const items = [];
-        $('[data-qa="discovery-media-list-item"]').each((i, el) => {
-            const $el = $(el);
-            const title = $el.find('[data-qa="discovery-media-list-item-title"]').text().trim();
-            if (!title) return;
-            const scoreEl = $el.find('score-pairs');
-            items.push({
-                title: title,
-                tomatoScore: scoreEl.attr('critics-score') || "",
-                popcornScore: scoreEl.attr('audiencescore') || "",
-                mediaType: type.includes("tv") ? "tv" : "movie"
-            });
+        const res = await Widget.http.get(url, { 
+            headers: { 
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" 
+            } 
         });
-        return items;
+        const html = typeof res === 'string' ? res : (res.data || "");
+        const $ = Widget.html.load(html);
+        const items = [];
+        
+        // 🌟 核心重构：不再依赖脆弱的最外层结构，直接查找最稳定的标题节点
+        const titleNodes = $('[data-qa="discovery-media-list-item-title"], [data-qa="list-item-title"], .js-tile-link .p--small');
+        
+        if (titleNodes.length > 0) {
+            titleNodes.each((i, el) => {
+                const title = $(el).text().trim();
+                if (!title) return;
+
+                // 像爬树一样往上找：不管外层怎么改，分数组件总是和标题在同一个大卡片里
+                let container = $(el).parent();
+                for (let level = 0; level < 5; level++) {
+                    if (container.find('score-board, score-pairs, score-pairs-deprecated').length > 0) {
+                        break;
+                    }
+                    if (container.length === 0) break;
+                    container = container.parent();
+                }
+
+                let tomatoScore = "";
+                let popcornScore = "";
+                
+                // 兼容最新版 <score-board> 和各种老版分数标签
+                const scoreTags = ['score-board', 'score-pairs', 'score-pairs-deprecated'];
+                for (const tag of scoreTags) {
+                    const scoreEl = container.find(tag);
+                    if (scoreEl.length > 0) {
+                        tomatoScore = scoreEl.attr('tomatometerscore') || scoreEl.attr('critics-score') || scoreEl.attr('criticsscore') || "";
+                        popcornScore = scoreEl.attr('audiencescore') || scoreEl.attr('audience-score') || "";
+                        break;
+                    }
+                }
+
+                items.push({
+                    title: title,
+                    tomatoScore: tomatoScore,
+                    popcornScore: popcornScore,
+                    mediaType: type.includes("tv") ? "tv" : "movie"
+                });
+            });
+        }
+
+        // 去重防御：防止烂番茄网页渲染重叠节点导致抓取重复
+        const uniqueItems = [];
+        const seen = new Set();
+        for (const item of items) {
+            const cleanTitle = item.title.replace(/\s+/g, ' ').trim();
+            if (cleanTitle && !seen.has(cleanTitle)) {
+                seen.add(cleanTitle);
+                item.title = cleanTitle;
+                uniqueItems.push(item);
+            }
+        }
+
+        return uniqueItems;
     } catch (e) { return []; }
 }
 
@@ -149,9 +196,8 @@ async function searchTmdb(rtItem, rank) {
             params: { query: cleanTitle, language: "zh-CN", page: 1 }
         });
         
-        // 🌟 强力校验：必须有海报才算是正常的剧
         const match = (res.results || []).find(item => item.poster_path);
-        if (!match) return null; // 搜不到或者没有海报直接丢弃
+        if (!match) return null; 
 
         let scores = [];
         if (rtItem.tomatoScore) scores.push(`新鲜度 ${rtItem.tomatoScore}%`);
@@ -164,7 +210,7 @@ async function searchTmdb(rtItem, rank) {
 }
 
 // =========================================================================
-// 3. FlixPatrol 逻辑 (高精度抓取替换版)
+// 3. FlixPatrol 逻辑 (保持高精度不变)
 // =========================================================================
 
 async function loadFlixPatrol(platform, region = "united-states", mediaType = "tv") {
@@ -189,21 +235,15 @@ async function fetchFlixPatrolData(platform, region, mediaType) {
         const tables = $('.card-table tbody');
         if (tables.length === 0) return [];
         
-        // 🌟 核心修复点：针对不同平台的专属表格索引逻辑
         let tableIndex = 0;
         if (platform === "disney") {
-            // Disney+: [0] All, [1] Movie, [2] TV
             tableIndex = mediaType === "all" ? 0 : (mediaType === "movie" ? 1 : 2);
         } else if (platform === "hbo") {
-            // HBO: [0] Movie, [1] TV (无综合榜单)
-            // 如果用户选了"综合"，为了防崩溃，默认退回到 TV 榜单
             tableIndex = mediaType === "movie" ? 0 : 1;
         } else {
-            // Netflix, Apple, Amazon: [0] Movie, [1] TV, [2] All
             tableIndex = mediaType === "movie" ? 0 : (mediaType === "tv" ? 1 : 2);
         }
 
-        // 安全防越界：如果该平台某天突然少了表格，取它能拿到的最后一个
         if (tableIndex >= tables.length) {
             tableIndex = tables.length - 1;
         }
@@ -211,7 +251,7 @@ async function fetchFlixPatrolData(platform, region, mediaType) {
         const targetTable = tables.eq(tableIndex);
         const titles = [];
         targetTable.find('tr').each((i, el) => {
-            if (i >= 10) return; // 取 Top 10
+            if (i >= 10) return; 
 
             const textLink = $(el).find('a.hover\\:underline').text().trim();
             const textTd = $(el).find('td').eq(2).text().trim();
@@ -242,14 +282,13 @@ async function searchTmdbFP(title, mediaType, rank) {
         if (results.length === 0) return null;
 
         const now = Date.now();
-        const oneYearAgo = now - (365 * 24 * 60 * 60 * 1000); // 电影近一年
-        const sixMonthsAgo = now - (180 * 24 * 60 * 60 * 1000); // 剧集近半年
+        const oneYearAgo = now - (365 * 24 * 60 * 60 * 1000); 
+        const sixMonthsAgo = now - (180 * 24 * 60 * 60 * 1000); 
 
         let bestMatch = null;
 
-        // 🌟 新增海报强校验：循环时，只看带海报的结果
         for (let item of results.slice(0, 5)) {
-            if (!item.poster_path) continue; // 没海报直接 pass，看下一个
+            if (!item.poster_path) continue; 
 
             const itemType = item.media_type || (mediaType === "all" ? "movie" : mediaType);
             
@@ -284,12 +323,10 @@ async function searchTmdbFP(title, mediaType, rank) {
             }
         }
 
-        // 🛡️ 兜底保护：如果时间不匹配，找第一个【带有海报】的。
         if (!bestMatch) {
             bestMatch = results.find(item => item.poster_path);
         }
         
-        // 🚀 终极丢弃：如果连带海报的兜底都没有，说明这是野鸡名字，果断丢弃！
         if (!bestMatch) return null; 
 
         const actualMediaType = bestMatch.media_type || (mediaType === "all" ? "movie" : mediaType);
@@ -315,7 +352,6 @@ async function fetchTmdbFallback(platform, region, mediaType) {
             }
         });
         
-        // 确保兜底结果也有海报
         const validResults = (res.results || []).filter(item => item.poster_path);
         return validResults.slice(0, 10).map((item, i) => buildItem(item, tmdbMediaType, { rank: i + 1 }));
     } catch (e) { return []; }
@@ -355,7 +391,6 @@ function buildItem(item, mediaType, { rank, customSub } = {}) {
         releaseDate: dateStr, 
         subTitle: "", 
         
-        // 因为我们在上方已经过滤了无海报项，这里基本保证非空，但保留容错
         posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "",
         backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "",
         
