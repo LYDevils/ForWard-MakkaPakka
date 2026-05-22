@@ -18,9 +18,9 @@ env:
   # Full-match regex. Leave empty to exclude nothing.
   EXCLUDE_BRANCH_REGEX: ""
   # Comma-separated labels to apply on the PR. Leave empty to skip.
-  PR_LABELS: upstream-sync,auto-sync
+  PR_LABELS: 上游同步,自动同步
   # Comma-separated assignees. Leave empty to skip.
-  PR_ASSIGNEES: ""
+  PR_ASSIGNEES: LYDevils
   # Comma-separated reviewers. Leave empty to skip.
   PR_REVIEWERS: ""
 
@@ -150,6 +150,27 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          if [ -n "${PR_LABELS}" ]; then
+            IFS=',' read -ra LABEL_ARRAY <<< "${PR_LABELS}"
+            for LABEL_NAME in "${LABEL_ARRAY[@]}"; do
+              TRIMMED_LABEL="$(echo "${LABEL_NAME}" | xargs)"
+              if [ -z "${TRIMMED_LABEL}" ]; then
+                continue
+              fi
+              case "${TRIMMED_LABEL}" in
+                "上游同步")
+                  gh label create "${TRIMMED_LABEL}" --color "1D76DB" --description "来自上游仓库的同步更新" --force
+                  ;;
+                "自动同步")
+                  gh label create "${TRIMMED_LABEL}" --color "0E8A16" --description "由 GitHub Actions 自动创建或更新" --force
+                  ;;
+                *)
+                  gh label create "${TRIMMED_LABEL}" --color "BFD4F2" --description "自动同步工作流标签" --force
+                  ;;
+              esac
+            done
+          fi
+
           EXISTING_PR_NUMBER="$(gh pr list \
             --base "${{ matrix.target_branch }}" \
             --head "${{ matrix.sync_branch }}" \
