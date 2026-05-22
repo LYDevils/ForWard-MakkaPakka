@@ -50,16 +50,16 @@ jobs:
           export BRANCH_LINES="$(printf '%s\n' "${BRANCHES[@]}")"
 
           python3 - <<'PY' >> "$GITHUB_OUTPUT"
-import json
-import os
-import re
+          import json
+          import os
+          import re
 
-branches = [line.strip() for line in os.environ.get("BRANCH_LINES", "").splitlines() if line.strip()]
-include_regex = os.environ.get("INCLUDE_BRANCH_REGEX", ".*").strip() or ".*"
-exclude_regex = os.environ.get("EXCLUDE_BRANCH_REGEX", "").strip()
+          branches = [line.strip() for line in os.environ.get("BRANCH_LINES", "").splitlines() if line.strip()]
+          include_regex = os.environ.get("INCLUDE_BRANCH_REGEX", ".*").strip() or ".*"
+          exclude_regex = os.environ.get("EXCLUDE_BRANCH_REGEX", "").strip()
 
-include_pattern = re.compile(include_regex)
-exclude_pattern = re.compile(exclude_regex) if exclude_regex else None
+          include_pattern = re.compile(include_regex)
+          exclude_pattern = re.compile(exclude_regex) if exclude_regex else None
 
           include = []
           for branch in branches:
