@@ -61,23 +61,23 @@ exclude_regex = os.environ.get("EXCLUDE_BRANCH_REGEX", "").strip()
 include_pattern = re.compile(include_regex)
 exclude_pattern = re.compile(exclude_regex) if exclude_regex else None
 
-matrix = []
-for branch in branches:
-    if not include_pattern.fullmatch(branch):
-        continue
-    if exclude_pattern and exclude_pattern.fullmatch(branch):
-        continue
-    matrix.append(
-        {
-            "upstream_branch": branch,
-            "target_branch": branch,
-            "sync_branch": f"sync/upstream/{branch}",
-        }
-    )
+          include = []
+          for branch in branches:
+              if not include_pattern.fullmatch(branch):
+                  continue
+              if exclude_pattern and exclude_pattern.fullmatch(branch):
+                  continue
+              include.append(
+                  {
+                      "upstream_branch": branch,
+                      "target_branch": branch,
+                      "sync_branch": f"sync/upstream/{branch}",
+                  }
+              )
 
-print(f"branch_count={len(matrix)}")
-print("matrix=" + json.dumps(matrix, ensure_ascii=True))
-PY
+          print(f"branch_count={len(include)}")
+          print("matrix=" + json.dumps({"include": include}, ensure_ascii=True))
+          PY
 
   sync-and-pr:
     name: Sync ${{ matrix.upstream_branch }} -> ${{ matrix.target_branch }}
@@ -86,8 +86,7 @@ PY
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        include: ${{ fromJson(needs.discover.outputs.matrix) }}
+      matrix: ${{ fromJSON(needs.discover.outputs.matrix) }}
     concurrency:
       group: sync-upstream-pr-${{ github.repository }}-${{ matrix.target_branch }}
       cancel-in-progress: false
