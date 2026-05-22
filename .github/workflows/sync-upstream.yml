@@ -1,0 +1,212 @@
+name: Sync Upstream And Open PR
+
+on:
+  schedule:
+    # UTC time. This example runs every 6 hours.
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  # Final ready-to-use example for MakkaPakka518/FW
+  UPSTREAM_REPO: MakkaPakka518/FW
+  # Full-match regex. Keep ".*" to include every upstream branch.
+  INCLUDE_BRANCH_REGEX: ".*"
+  # Full-match regex. Leave empty to exclude nothing.
+  EXCLUDE_BRANCH_REGEX: ""
+  # Comma-separated labels to apply on the PR. Leave empty to skip.
+  PR_LABELS: upstream-sync,auto-sync
+  # Comma-separated assignees. Leave empty to skip.
+  PR_ASSIGNEES: ""
+  # Comma-separated reviewers. Leave empty to skip.
+  PR_REVIEWERS: ""
+
+jobs:
+  discover:
+    name: Discover upstream branches
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.discover.outputs.matrix }}
+      branch_count: ${{ steps.discover.outputs.branch_count }}
+
+    steps:
+      - name: Build branch matrix
+        id: discover
+        shell: bash
+        run: |
+          mapfile -t BRANCHES < <(
+            git ls-remote --heads "https://github.com/${UPSTREAM_REPO}.git" \
+              | awk '{print $2}' \
+              | sed 's#refs/heads/##' \
+              | sort
+          )
+
+          printf 'Detected upstream branches:\n'
+          printf ' - %s\n' "${BRANCHES[@]}"
+
+          export BRANCH_LINES="$(printf '%s\n' "${BRANCHES[@]}")"
+
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+import json
+import os
+import re
+
+branches = [line.strip() for line in os.environ.get("BRANCH_LINES", "").splitlines() if line.strip()]
+include_regex = os.environ.get("INCLUDE_BRANCH_REGEX", ".*").strip() or ".*"
+exclude_regex = os.environ.get("EXCLUDE_BRANCH_REGEX", "").strip()
+
+include_pattern = re.compile(include_regex)
+exclude_pattern = re.compile(exclude_regex) if exclude_regex else None
+
+matrix = []
+for branch in branches:
+    if not include_pattern.fullmatch(branch):
+        continue
+    if exclude_pattern and exclude_pattern.fullmatch(branch):
+        continue
+    matrix.append(
+        {
+            "upstream_branch": branch,
+            "target_branch": branch,
+            "sync_branch": f"sync/upstream/{branch}",
+        }
+    )
+
+print(f"branch_count={len(matrix)}")
+print("matrix=" + json.dumps(matrix, ensure_ascii=True))
+PY
+
+  sync-and-pr:
+    name: Sync ${{ matrix.upstream_branch }} -> ${{ matrix.target_branch }}
+    needs: discover
+    if: needs.discover.outputs.branch_count != '0'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.discover.outputs.matrix) }}
+    concurrency:
+      group: sync-upstream-pr-${{ github.repository }}-${{ matrix.target_branch }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout fork repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Add and fetch upstream
+        shell: bash
+        run: |
+          git remote remove upstream || true
+          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
+          git fetch upstream "${{ matrix.upstream_branch }}" --prune
+          git fetch origin "${{ matrix.target_branch }}" --prune || true
+
+      - name: Ensure target branch exists
+        id: target
+        shell: bash
+        run: |
+          if git show-ref --verify --quiet "refs/remotes/origin/${{ matrix.target_branch }}"; then
+            echo "target_exists=true" >> "$GITHUB_OUTPUT"
+            git checkout --force -B "${{ matrix.target_branch }}" "origin/${{ matrix.target_branch }}"
+          else
+            echo "target_exists=false" >> "$GITHUB_OUTPUT"
+            git checkout --force -B "${{ matrix.target_branch }}" "upstream/${{ matrix.upstream_branch }}"
+            git push origin "${{ matrix.target_branch }}"
+          fi
+
+      - name: Refresh sync branch from upstream
+        shell: bash
+        run: |
+          git checkout --force -B "${{ matrix.sync_branch }}" "upstream/${{ matrix.upstream_branch }}"
+          git push origin "${{ matrix.sync_branch }}" --force
+
+      - name: Check whether a PR is needed
+        id: diff
+        shell: bash
+        run: |
+          if [ "${{ steps.target.outputs.target_exists }}" != "true" ]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "reason=target branch created from upstream; no PR needed on first sync" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet "origin/${{ matrix.target_branch }}...${{ matrix.sync_branch }}"; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "reason=no upstream changes" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            echo "reason=upstream has new commits" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create or update pull request
+        if: steps.diff.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          EXISTING_PR_NUMBER="$(gh pr list \
+            --base "${{ matrix.target_branch }}" \
+            --head "${{ matrix.sync_branch }}" \
+            --state open \
+            --json number \
+            --jq '.[0].number')"
+
+          PR_TITLE="Sync upstream ${UPSTREAM_REPO}:${{ matrix.upstream_branch }} into ${{ matrix.target_branch }}"
+          PR_BODY=$(cat <<EOF
+          This pull request was created automatically.
+
+          Upstream repository: \`${UPSTREAM_REPO}\`
+          Upstream branch: \`${{ matrix.upstream_branch }}\`
+          Target branch: \`${{ matrix.target_branch }}\`
+          Sync branch: \`${{ matrix.sync_branch }}\`
+
+          Notes:
+          - The sync branch is refreshed from upstream on every run.
+          - Review and merge this PR when you are ready.
+          - If there are conflicts, resolve them in this PR before merging.
+          EOF
+          )
+
+          if [ -n "${EXISTING_PR_NUMBER}" ] && [ "${EXISTING_PR_NUMBER}" != "null" ]; then
+            gh pr edit "${EXISTING_PR_NUMBER}" --title "${PR_TITLE}" --body "${PR_BODY}"
+            echo "Updated existing PR #${EXISTING_PR_NUMBER}"
+            PR_NUMBER="${EXISTING_PR_NUMBER}"
+          else
+            gh pr create \
+              --base "${{ matrix.target_branch }}" \
+              --head "${{ matrix.sync_branch }}" \
+              --title "${PR_TITLE}" \
+              --body "${PR_BODY}"
+            PR_NUMBER="$(gh pr list \
+              --base "${{ matrix.target_branch }}" \
+              --head "${{ matrix.sync_branch }}" \
+              --state open \
+              --json number \
+              --jq '.[0].number')"
+          fi
+
+          if [ -n "${PR_LABELS}" ]; then
+            gh pr edit "${PR_NUMBER}" --add-label "${PR_LABELS}"
+          fi
+
+          if [ -n "${PR_ASSIGNEES}" ]; then
+            gh pr edit "${PR_NUMBER}" --add-assignee "${PR_ASSIGNEES}"
+          fi
+
+          if [ -n "${PR_REVIEWERS}" ]; then
+            gh pr edit "${PR_NUMBER}" --add-reviewer "${PR_REVIEWERS}"
+          fi
+
+      - name: No changes
+        if: steps.diff.outputs.has_changes != 'true'
+        shell: bash
+        run: |
+          echo "Skip PR for ${{ matrix.upstream_branch }} -> ${{ matrix.target_branch }}"
+          echo "Reason: ${{ steps.diff.outputs.reason }}"
