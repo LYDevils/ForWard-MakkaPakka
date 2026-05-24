@@ -3,20 +3,20 @@
  * 结合了官方匹配逻辑与自定义高级过滤，全面采用 Promise.all 并发提速，找回原本的速度！
  */
 WidgetMetadata = {
-  id: "danmu_api_Max_binfa_fast",
-  title: "并发弹幕 (极速匹配版)",
-  version: "1.3.3",
+  id: "danmu_api_Max_binfa",
+  title: "并发弹幕",
+  version: "1.3.4", // 
   requiredVersion: "0.0.2",
   site: "https://t.me/MakkaPakkaOvO",
-  description: "全并发提速、保留完整选集、支持自定义源名称、繁简互转、数量限制、关键词屏蔽、颜色重写。",
-  author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖 & 编码助手",
+  description: "并发搜索多API、自定义名称、繁简互转、数量限制、关键词屏蔽、颜色重写（并发极速版）",
+  author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
   
   globalParams: [
-      { name: "serverName", title: "🏷️ 源1 名称 (选填)", type: "input", value: "主节点", description: "例如：我的专属节点" },
-      { name: "server", title: "🔗 源1 链接 (必填)", type: "input", value: "https://api.dandanplay.net" },
-      { name: "serverName2", title: "🏷️ 源2 名称 (选填)", type: "input" },
+      { name: "serverName", title: "🏷️ 源1 名称", type: "input", value: "主源", description: "例如：弹幕源1" },
+      { name: "server", title: "🔗 源1 链接", type: "input", value: "https://api.dandanplay.net" },
+      { name: "serverName2", title: "🏷️ 源2 名称", type: "input" },
       { name: "server2", title: "🔗 源2 链接", type: "input" },
-      { name: "serverName3", title: "🏷️ 源3 名称 (选填)", type: "input" },
+      { name: "serverName3", title: "🏷️ 源3 名称", type: "input" },
       { name: "server3", title: "🔗 源3 链接", type: "input" },
       { 
           name: "maxCount", 
