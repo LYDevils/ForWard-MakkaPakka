@@ -1,148 +1,111 @@
-// =============UserScript=============
-// @name         并发弹幕 (官方核心精调版)
-// @version      2.0.0
-// @description  基于 Forward 官方最新弹幕逻辑，融合二改版的并发、颜色重写、繁简互转、数量限制及屏蔽功能。
-// @author       Forward & 𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖 & Fix
-// =============UserScript=============
-
+/**
+ * 融合版 并发弹幕 Max
+ * 结合了官方 1.1.6 强大的匹配搜索逻辑与自定义的高级过滤、转换和着色功能
+ */
 WidgetMetadata = {
-  id: "danmu_api_Max_binfa_v2",
-  title: "并发弹幕 (Pro)",
-  version: "2.0.0",
+  id: "danmu_api_Max_binfa_test",
+  title: "并发弹幕test",
+  version: "1.3.0",
   requiredVersion: "0.0.2",
-  description: "基于官方最新逻辑二改：支持繁简互转、数量限制、关键词屏蔽、颜色重写。全局参数支持多个自定义服务器，以换行分割。",
-  author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
   site: "https://t.me/MakkaPakkaOvO",
+  description: "并发搜索、繁简互转、数量限制、关键词屏蔽、颜色重写。已同步官方最新四步匹配与异步获取逻辑。",
+  author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖 & 编码助手",
+  
   globalParams: [
-    {
-      name: "server",
-      title: "自定义服务器",
-      type: "input",
-      description: "多服务器请换行分割，格式如：弹弹play,https://api.dandanplay.net",
-      placeholders: [
-        {
-          title: "弹弹play",
-          value: "https://api.dandanplay.net",
-        },
-      ],
-    },
-    { 
-      name: "maxCount", 
-      title: "📊 弹幕数量上限", 
-      type: "input", 
-      value: "3000",
-      description: "填0或留空不限制。超出则按时间全段等比例随机剔除" 
-    },
-    { 
-      name: "searchBlockKeywords", 
-      title: "👁️ 搜索结果屏蔽词 (逗号分隔)", 
-      type: "input", 
-      value: "",
-      description: "屏蔽不想看到的搜索结果，如: 动态漫,电视剧,漫画" 
-    },
-    { 
-      name: "convertMode", 
-      title: "🔠 弹幕转换", 
-      type: "enumeration", 
-      value: "none",
-      enumOptions: [
-          { title: "保持原样", value: "none" },
-          { title: "转简体 (繁->简)", value: "t2s" },
-          { title: "转繁体 (简->繁)", value: "s2t" }
-      ]
-    },
-    { 
-      name: "colorMode", 
-      title: "🎨 弹幕颜色", 
-      type: "enumeration", 
-      value: "none",
-      enumOptions: [
-          { title: "保持原样", value: "none" },
-          { title: "全部纯白", value: "white" },
-          { title: "部分彩色 (50%彩色)", value: "partial" },
-          { title: "完全彩色 (100%彩色)", value: "all" }
-      ]
-    },
-    { 
-      name: "blockKeywords", 
-      title: "🚫 弹幕内容屏蔽词 (逗号分隔)", 
-      type: "input", 
-      value: "" 
-    }
+      { name: "server", title: "源1 (必填)", type: "input", value: "https://api.dandanplay.net" },
+      { name: "server2", title: "源2", type: "input" },
+      { name: "server3", title: "源3", type: "input" },
+      { 
+          name: "maxCount", 
+          title: "📊 弹幕数量上限", 
+          type: "input", 
+          value: "3000",
+          description: "填0或留空不限制。超出则按时间全段等比例随机剔除" 
+      },
+      { 
+          name: "searchBlockKeywords", 
+          title: "👁️ 搜索结果屏蔽词 (逗号分隔)", 
+          type: "input", 
+          value: "",
+          description: "屏蔽不想看到的搜索结果，如: 动态漫,电视剧,漫画" 
+      },
+      { 
+          name: "convertMode", 
+          title: "🔠 弹幕转换", 
+          type: "enumeration", 
+          value: "none",
+          enumOptions: [
+              { title: "保持原样", value: "none" },
+              { title: "转简体 (繁->简)", value: "t2s" },
+              { title: "转繁体 (简->繁)", value: "s2t" }
+          ]
+      },
+      { 
+          name: "colorMode", 
+          title: "🎨 弹幕颜色", 
+          type: "enumeration", 
+          value: "none",
+          enumOptions: [
+              { title: "保持原样", value: "none" },
+              { title: "全部纯白", value: "white" },
+              { title: "部分彩色 (50%彩色)", value: "partial" },
+              { title: "完全彩色 (100%彩色)", value: "all" }
+          ]
+      },
+      { 
+          name: "blockKeywords", 
+          title: "🚫 弹幕内容屏蔽词 (逗号分隔)", 
+          type: "input", 
+          value: "" 
+      }
   ],
   modules: [
-    {
-      id: "searchDanmu",
-      title: "搜索弹幕",
-      functionName: "searchDanmu",
-      type: "danmu",
-      params: [],
-    },
-    {
-      id: "getDetail",
-      title: "获取详情",
-      functionName: "getDetailById",
-      type: "danmu",
-      params: [],
-    },
-    {
-      id: "getComments",
-      title: "获取弹幕",
-      functionName: "getCommentsById",
-      type: "danmu",
-      params: [],
-    },
-  ],
+      { id: "searchDanmu", title: "搜索弹幕", functionName: "searchDanmu", type: "danmu", params: [] },
+      { id: "getDetail", title: "获取详情", functionName: "getDetailById", type: "danmu", params: [] },
+      { id: "getComments", title: "获取弹幕", functionName: "getCommentsById", type: "danmu", params: [] }
+  ]
 };
 
 // ==========================================
-// 1. 繁简转换与颜色核心 (二改功能区)
+// 1. 繁简转换核心 (保留自定义逻辑)
 // ==========================================
 const DICT_URL_S2T = "https://cdn.jsdelivr.net/npm/opencc-data@1.0.3/data/STCharacters.txt";
 const DICT_URL_T2S = "https://cdn.jsdelivr.net/npm/opencc-data@1.0.3/data/TSCharacters.txt";
-
 let MEM_DICT = null;
 
 async function initDict(mode) {
-    if (!mode || mode === "none") return;
-    if (MEM_DICT) return; 
-
-    const key = `dict_${mode}`;
-    let local = await Widget.storage.get(key);
-
-    if (!local) {
-        try {
-            const res = await Widget.http.get(mode === "t2s" ? DICT_URL_T2S : DICT_URL_S2T);
-            local = res.data;
-            await Widget.storage.set(key, local);
-        } catch (e) {
-            console.error("字典加载失败", e);
-            return;
-        }
-    }
-
-    MEM_DICT = new Map();
-    const lines = local.split('\n');
-    for (let line of lines) {
-        if (!line) continue;
-        const [from, to] = line.split('\t');
-        if (from && to) {
-            MEM_DICT.set(from, to.split(' ')[0]);
-        }
-    }
+  if (!mode || mode === "none") return;
+  if (MEM_DICT) return; 
+  const key = `dict_${mode}`;
+  let local = await Widget.storage.get(key);
+  if (!local) {
+      try {
+          const res = await Widget.http.get(mode === "s2t" ? DICT_URL_S2T : DICT_URL_T2S);
+          let text = res.data || res;
+          if (typeof text === 'string' && text.length > 100) {
+              const map = {};
+              text.split('\n').forEach(l => {
+                  const p = l.split(/\s+/);
+                  if (p.length >= 2) map[p[0]] = p[1];
+              });
+              await Widget.storage.set(key, JSON.stringify(map));
+              MEM_DICT = map;
+          }
+      } catch (e) {}
+  } else {
+      try { MEM_DICT = JSON.parse(local); } catch (e) {}
+  }
 }
 
 function convertText(text) {
-    if (!MEM_DICT || !text) return text;
-    let res = "";
-    for (let char of text) {
-        res += MEM_DICT.get(char) || char;
-    }
-    return res;
+  if (!text || !MEM_DICT) return text;
+  let res = "";
+  for (let char of text) { res += MEM_DICT[char] || char; }
+  return res;
 }
 
 // ==========================================
-// 2. 官方核心逻辑区 (Danmu.js v1.1.6 基础)
+// 2. 官方底层工具函数 (服务器处理与ID绑定)
 // ==========================================
 const DEFAULT_DANMU_SERVER = "https://api.dandanplay.net";
 const DANMU_SERVER_ID_SEPARATOR = "__FORWARD_DANMU_SERVER__";
@@ -153,11 +116,7 @@ function normalizeDanmuServer(server) {
 }
 
 function getDanmuSourceTitle(server) {
-  try {
-    return new URL(server).host || server;
-  } catch (error) {
-    return server;
-  }
+  try { return new URL(server).host || server; } catch (error) { return server; }
 }
 
 function looksLikeServerAddress(value) {
@@ -176,36 +135,23 @@ function makeDanmuSource(title, server, explicitTitle) {
 
 function parseDanmuSourceLine(line) {
   const separatorMatch = line.match(/[，,]/);
-  if (!separatorMatch) {
-    return makeDanmuSource("", line, false);
-  }
-
+  if (!separatorMatch) return makeDanmuSource("", line, false);
   const separatorIndex = separatorMatch.index;
   const title = line.slice(0, separatorIndex).trim();
   const server = line.slice(separatorIndex + separatorMatch[0].length).trim();
-
-  if (!server && looksLikeServerAddress(title)) {
-    return makeDanmuSource("", title, false);
-  }
-
+  if (!server && looksLikeServerAddress(title)) return makeDanmuSource("", title, false);
   return makeDanmuSource(title, server, true);
 }
 
-function getDanmuSources(server) {
-  const serverValue = Array.isArray(server) ? server.join("\n") : server;
-  const rawValue = String(serverValue || "").trim();
-
-  if (!rawValue) {
-    return [makeDanmuSource("弹弹play", DEFAULT_DANMU_SERVER, true)];
-  }
-
-  const lines = rawValue.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  if (lines.length === 1) {
-    const commaParts = lines[0].split(/[，,]/).map((item) => item.trim()).filter(Boolean);
-    if (commaParts.length > 1 && commaParts.every(looksLikeServerAddress)) {
-      return dedupeDanmuSources(commaParts.map((item) => makeDanmuSource("", item, false)));
-    }
-  }
+// 修改点：支持整合 params 里的 server1, server2, server3
+function getMergedDanmuSources(server1, server2, server3) {
+  const allServers = [server1, server2, server3].filter(s => s && String(s).trim().length > 0);
+  if (allServers.length === 0) return [makeDanmuSource("弹弹play", DEFAULT_DANMU_SERVER, true)];
+  
+  let lines = [];
+  allServers.forEach(s => {
+      lines.push(...String(s).split(/\r?\n/).map(line => line.trim()).filter(Boolean));
+  });
 
   return dedupeDanmuSources(lines.map(parseDanmuSourceLine).filter((source) => source.server));
 }
@@ -221,305 +167,426 @@ function dedupeDanmuSources(sources) {
 }
 
 function bindDanmuServerId(id, source, shouldBind) {
-  if (!shouldBind || id === undefined || id === null) {
-    return id;
-  }
-
-  const payload = JSON.stringify({
-    title: source.title,
-    server: source.server,
-  });
-
+  if (!shouldBind || id === undefined || id === null) return id;
+  const payload = JSON.stringify({ title: source.title, server: source.server });
   return `${encodeURIComponent(payload)}${DANMU_SERVER_ID_SEPARATOR}${id}`;
 }
 
 function parseDanmuServerId(id) {
-  if (typeof id !== "string") {
-    return { id, source: null };
-  }
-
+  if (typeof id !== "string") return { id, source: null };
   const separatorIndex = id.indexOf(DANMU_SERVER_ID_SEPARATOR);
-  if (separatorIndex === -1) {
-    return { id, source: null };
-  }
+  if (separatorIndex === -1) return { id, source: null };
 
   const encodedSource = id.slice(0, separatorIndex);
   const rawId = id.slice(separatorIndex + DANMU_SERVER_ID_SEPARATOR.length);
   const decodedSource = decodeURIComponent(encodedSource);
-
   try {
     const source = JSON.parse(decodedSource);
     if (source && source.server) {
-      return { id: rawId, source };
+      return { id: rawId, source: makeDanmuSource(source.title, source.server, true) };
     }
-  } catch (error) {
-    console.error("解析弹幕服务器 ID 失败:", error);
-  }
+  } catch (error) {}
+  return { id: rawId, source: makeDanmuSource("", decodedSource, false) };
+}
 
-  return { id, source: null };
+function getDanmuRequestSources(mergedSources, boundSource) {
+  return boundSource ? [boundSource] : mergedSources;
+}
+
+function shouldShowDanmuSource(sources) {
+  return sources.some((source) => source.explicitTitle) || sources.length > 1;
+}
+
+function appendDanmuSourceTitle(title, source, shouldAppend) {
+  if (!shouldAppend) return title;
+  return `${title} - ${source.title}`;
 }
 
 function getDanmuHeaders() {
-  return {
-    Accept: "application/json",
+  return { "Content-Type": "application/json", "User-Agent": "ForwardWidgets/1.0.0" };
+}
+
+async function mapDanmuSourcesInBatches(sources, batchSize, task) {
+  const results = [];
+  for (let index = 0; index < sources.length; index += batchSize) {
+    const batch = sources.slice(index, index + batchSize);
+    const batchResults = await Promise.all(batch.map(task));
+    results.push(...batchResults);
+  }
+  return results;
+}
+
+// 官方季数提取逻辑
+function extractSeasonNumber(animeTitle) {
+  const title = String(animeTitle || "");
+  let m = title.match(/第\s*([0-9一二三四五六七八九十壹贰叁肆伍陆柒捌玖拾]+)\s*[季部]/);
+  if (m) {
+    const n = convertChineseNumber(m[1]);
+    if (n > 0) return n;
+  }
+  m = title.match(/(?:_|\bS|\bSeason\s+)(\d{1,2})\b/i);
+  if (m) return Number(m[1]);
+  m = title.match(/[^\d](\d{1,2})$/);
+  if (m) return Number(m[1]);
+  return null;
+}
+
+// 官方动漫过滤逻辑
+function filterAnimes(rawAnimes, type, season, queryTitle) {
+  const movieTypes = ["movie", "电影", "奇幻片", "剧场版"];
+  let animes = [];
+  if (rawAnimes && rawAnimes.length > 0) {
+    animes = rawAnimes.filter((anime) => {
+      const animeType = (anime.type || "").toLowerCase();
+      if (type === "movie") return movieTypes.some(t => t.toLowerCase() === animeType);
+      if (type === "tv") return !movieTypes.some(t => t.toLowerCase() === animeType);
+      return true;
+    });
+    if (season) {
+      const seasonNum = Number(season);
+      const matchedAnimes = animes.filter((anime) => {
+        if (!anime.animeTitle.includes(queryTitle)) return false;
+        const animeSeason = extractSeasonNumber(anime.animeTitle);
+        return animeSeason !== null && animeSeason === seasonNum;
+      });
+      if (matchedAnimes.length > 0) animes = matchedAnimes;
+    }
+  }
+  return animes;
+}
+
+function convertChineseNumber(chineseNumber) {
+  if (/^\d+$/.test(chineseNumber)) return Number(chineseNumber);
+  const digits = {
+    '零': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9,
+    '壹': 1, '貳': 2, '參': 3, '肆': 4, '伍': 5, '陸': 6, '柒': 7, '捌': 8, '玖': 9
   };
+  const units = { '十': 10, '百': 100, '千': 1000, '拾': 10, '佰': 100, '仟': 1000 };
+  let result = 0, current = 0, lastUnit = 1;
+  for (let i = 0; i < chineseNumber.length; i++) {
+    const char = chineseNumber[i];
+    if (digits[char] !== undefined) current = digits[char];
+    else if (units[char] !== undefined) {
+      const unit = units[char];
+      if (current === 0) current = 1;
+      if (unit >= lastUnit) result = current * unit;
+      else result += current * unit;
+      lastUnit = unit; current = 0;
+    }
+  }
+  if (current > 0) result += current;
+  return result;
 }
 
-function getDanmuRequestSources(serverParam, targetSource) {
-  const sources = getDanmuSources(serverParam);
-
-  if (!targetSource) {
-    return sources;
-  }
-
-  const matchedSource = sources.find((source) => source.server === targetSource.server);
-  if (matchedSource) {
-    return [matchedSource];
-  }
-
-  return [targetSource, ...sources];
-}
+// ==========================================
+// 3. 核心 API 方法 (整合搜索、详情与弹幕获取)
+// ==========================================
 
 async function searchDanmu(params) {
-  const { server, title } = params;
+  const { type, title, season, server, server2, server3, searchBlockKeywords } = params;
+  let queryTitle = title;
+  
+  // 结合所有源并发
+  const sources = getMergedDanmuSources(server, server2, server3);
+  const shouldBindSource = shouldShowDanmuSource(sources);
+  
+  const results = await mapDanmuSourcesInBatches(sources, DANMU_SOURCE_BATCH_SIZE, async (source) => {
+    try {
+      const response = await Widget.http.get(
+        `${source.server}/api/v2/search/anime?keyword=${encodeURIComponent(queryTitle)}`,
+        { headers: getDanmuHeaders() }
+      );
+      if (!response) throw new Error("获取数据失败");
+      const data = response.data;
+      if (!data.success) throw new Error(data.errorMessage || "API调用失败");
 
-  if (!title) {
-    throw new Error("搜索关键词不能为空");
-  }
-
-  const sources = getDanmuSources(server);
-  const promises = [];
-
-  for (const source of sources) {
-    promises.push(
-      (async () => {
-        try {
-          const response = await Widget.http.get(
-            `${source.server}/api/v2/search/episodes?anime=${encodeURIComponent(title)}`,
-            {
-              headers: getDanmuHeaders(),
-            }
-          );
-          return { source, data: response?.data || {} };
-        } catch (error) {
-          throw Object.assign(error, { source });
+      let rawAnimes = Array.isArray(data.animes) ? data.animes : [];
+      
+      // 官方逻辑：兜底 search/episodes
+      if (rawAnimes.length === 0) {
+        const epResponse = await Widget.http.get(
+          `${source.server}/api/v2/search/episodes?anime=${encodeURIComponent(queryTitle)}`,
+          { headers: getDanmuHeaders() }
+        );
+        const epData = epResponse && epResponse.data;
+        if (epData && Array.isArray(epData.animes)) {
+          rawAnimes = epData.animes.map(({ episodes, ...anime }) => anime);
         }
-      })()
-    );
-  }
+      }
 
-  const results = await Promise.allSettled(promises);
-  let allAnimes = [];
-  let hasSuccessfulResponse = false;
+      // 自定义逻辑：搜索结果屏蔽词过滤
+      if (rawAnimes.length > 0 && searchBlockKeywords) {
+          const blockedList = searchBlockKeywords.split(/[,，]/).map(k => k.trim()).filter(k => k.length > 0);
+          if (blockedList.length > 0) {
+              rawAnimes = rawAnimes.filter(a => {
+                  if (!a.animeTitle) return false;
+                  for (const keyword of blockedList) {
+                      if (a.animeTitle.includes(keyword)) return false; 
+                  }
+                  return true;
+              });
+          }
+      }
+
+      return {
+        source,
+        animes: filterAnimes(rawAnimes, type, season, queryTitle),
+      };
+    } catch (error) {
+      console.error(`请求 ${source.server} 失败:`, error);
+      return { source, error };
+    }
+  });
+
   let lastError = null;
+  let hasSuccessfulResponse = false;
+  const animes = [];
+  let seenIds = new Set(); // 多源去重
 
   for (const result of results) {
-    if (result.status === "fulfilled") {
-      hasSuccessfulResponse = true;
-      const { source, data } = result.value;
-      const animes = data.animes || [];
-
-      const boundAnimes = animes.map((anime) => {
-        const boundAnimeId = bindDanmuServerId(anime.animeId, source, sources.length > 1);
-        const sourceTitleStr = source.explicitTitle || sources.length > 1 ? `[${source.title}] ` : "";
-        return {
-          ...anime,
-          animeId: boundAnimeId,
-          animeTitle: `${sourceTitleStr}${anime.animeTitle}`,
-        };
-      });
-      allAnimes = allAnimes.concat(boundAnimes);
-    } else {
-      const { source, ...error } = result.reason;
-      lastError = error;
-      console.error(`请求 ${source.server} 失败:`, error);
+    if (result.error) {
+      lastError = result.error;
+      continue;
+    }
+    hasSuccessfulResponse = true;
+    for (const anime of result.animes) {
+        const uid = anime.bangumiId || anime.animeId;
+        // 去重判断
+        if (!seenIds.has(uid)) {
+            seenIds.add(uid);
+            animes.push({
+                ...anime,
+                animeId: bindDanmuServerId(uid, result.source, shouldBindSource),
+                animeTitle: appendDanmuSourceTitle(anime.animeTitle, result.source, shouldBindSource),
+            });
+        }
     }
   }
 
-  if (hasSuccessfulResponse) {
-    // ----------------------------------------------------
-    // ✨ 二改逻辑: 过滤搜索结果
-    // ----------------------------------------------------
-    const blockKeywordsStr = params.searchBlockKeywords;
-    if (blockKeywordsStr) {
-      const blockKeywords = blockKeywordsStr.split(',').map(k => k.trim()).filter(k => k);
-      if (blockKeywords.length > 0) {
-        allAnimes = allAnimes.filter(anime => {
-          const title = anime.animeTitle || "";
-          return !blockKeywords.some(keyword => title.includes(keyword));
-        });
-      }
-    }
-    
-    return { animes: allAnimes };
-  }
-
+  if (hasSuccessfulResponse) return { animes: animes };
   throw lastError || new Error("获取数据失败");
 }
 
+function cleanAnimeTitle(title) {
+  return String(title || "").replace(/（[^）]*）/g, "").replace(/\([^)]*\)/g, "").replace(/\s+/g, " ").trim();
+}
+
+async function fetchEpisodesByMatch(source, title, season, episode) {
+  const cleanTitle = cleanAnimeTitle(title).replace(/\s*第\s*[一二三四五六七八九十百零〇\d]+\s*[季部]\s*$/g, "").trim();
+  const e = Number(episode);
+  if (!cleanTitle || Number.isNaN(e) || e <= 0) return null;
+  const s = Number(season);
+  const seasonNum = !Number.isNaN(s) && s > 0 ? s : 1;
+  const fileName = `${cleanTitle} S${String(seasonNum).padStart(2, "0")}E${String(e).padStart(2, "0")}`;
+  try {
+    const response = await Widget.http.post(
+      `${source.server}/api/v2/match`,
+      { fileName, fileHash: null, fileSize: 0, videoDuration: 0 },
+      { headers: getDanmuHeaders() }
+    );
+    const data = response && response.data;
+    if (!data || !data.isMatched || !Array.isArray(data.matches) || data.matches.length === 0) return null;
+    const matched = data.matches[0];
+    return [{
+      episodeId: matched.episodeId,
+      episodeTitle: matched.episodeTitle || `第${e}集`,
+      episodeNumber: String(e),
+    }];
+  } catch (error) { return null; }
+}
+
+async function fetchEpisodesByBangumi(source, id) {
+  try {
+    const response = await Widget.http.get(`${source.server}/api/v2/bangumi/${id}`, { headers: getDanmuHeaders() });
+    const episodes = response && response.data && response.data.bangumi && response.data.bangumi.episodes;
+    return Array.isArray(episodes) && episodes.length > 0 ? episodes : null;
+  } catch (error) { return null; }
+}
+
+async function fetchEpisodesByLibrary(source, title, season) {
+  const query = cleanAnimeTitle(title);
+  if (!query) return null;
+  try {
+    const response = await Widget.http.get(
+      `${source.server}/api/v2/search/episodes?anime=${encodeURIComponent(query)}`,
+      { headers: getDanmuHeaders() }
+    );
+    const animes = response && response.data && response.data.animes;
+    if (!Array.isArray(animes) || animes.length === 0) return null;
+    let target = animes[0];
+    const s = Number(season);
+    if (animes.length > 1 && !Number.isNaN(s) && s > 0) {
+      const matched = animes.find((a) => extractSeasonNumber(a.animeTitle) === s);
+      if (matched) target = matched;
+    }
+    return Array.isArray(target.episodes) && target.episodes.length > 0 ? target.episodes : null;
+  } catch (error) { return null; }
+}
+
+async function fetchEpisodesByResearch(source, title, season) {
+  const query = cleanAnimeTitle(title);
+  if (!query) return null;
+  try {
+    const searchRes = await Widget.http.get(
+      `${source.server}/api/v2/search/anime?keyword=${encodeURIComponent(query)}`,
+      { headers: getDanmuHeaders() }
+    );
+    const animes = searchRes && searchRes.data && searchRes.data.animes;
+    if (!Array.isArray(animes) || animes.length === 0) return null;
+    let target = animes.find((a) => a.animeTitle === title);
+    if (!target) {
+      const cands = animes.filter((a) => {
+        const c = cleanAnimeTitle(a.animeTitle);
+        return c === query || c.startsWith(query) || query.startsWith(c);
+      });
+      const s = Number(season);
+      if (!Number.isNaN(s) && s > 0) {
+        target = cands.find((a) => extractSeasonNumber(a.animeTitle) === s);
+      }
+      target = target || cands[0];
+    }
+    if (!target) return null;
+    const freshId = target.bangumiId || target.animeId;
+    const detailRes = await Widget.http.get(
+      `${source.server}/api/v2/bangumi/${freshId}`,
+      { headers: getDanmuHeaders() }
+    );
+    const episodes = detailRes && detailRes.data && detailRes.data.bangumi && detailRes.data.bangumi.episodes;
+    return Array.isArray(episodes) && episodes.length > 0 ? episodes : null;
+  } catch (error) { return null; }
+}
+
 async function getDetailById(params) {
-  const { server, animeId } = params;
-
-  if (!animeId) {
-    throw new Error("动漫ID不能为空");
-  }
-
+  const { server, server2, server3, animeId, title, seriesName, season, episode } = params;
+  const matchTitle = seriesName || title;
   const parsedAnimeId = parseDanmuServerId(animeId);
-  const sources = getDanmuRequestSources(server, parsedAnimeId.source);
+  const sources = getDanmuRequestSources(getMergedDanmuSources(server, server2, server3), parsedAnimeId.source);
+  const shouldBindSource = shouldShowDanmuSource(sources) || Boolean(parsedAnimeId.source);
+  
   let lastError = null;
   let hasSuccessfulResponse = false;
-  let allEpisodes = [];
+  const allEpisodes = [];
 
   for (const source of sources) {
     try {
-      const response = await Widget.http.get(
-        `${source.server}/api/v2/anime/${parsedAnimeId.id}`,
-        {
-          headers: getDanmuHeaders(),
-        }
-      );
+      let episodes = await fetchEpisodesByMatch(source, matchTitle, season, episode);
+      if (!episodes) episodes = await fetchEpisodesByBangumi(source, parsedAnimeId.id);
+      if (!episodes) episodes = await fetchEpisodesByResearch(source, title, season);
+      if (!episodes) episodes = await fetchEpisodesByLibrary(source, title, season);
 
-      if (response && response.data) {
+      if (episodes) {
         hasSuccessfulResponse = true;
-        const data = response.data;
-        const episodes = data.anime?.episodes || data.episodes || [];
-        const boundEpisodes = episodes.map((episode) => {
-          const boundEpisodeId = bindDanmuServerId(
-            episode.episodeId,
-            source,
-            sources.length > 1
-          );
-          return {
-            ...episode,
-            episodeId: boundEpisodeId,
-          };
-        });
-
-        allEpisodes = allEpisodes.concat(boundEpisodes);
+        allEpisodes.push(...episodes.map((episode) => ({
+          ...episode,
+          episodeId: bindDanmuServerId(episode.episodeId, source, shouldBindSource),
+          episodeTitle: appendDanmuSourceTitle(episode.episodeTitle, source, shouldBindSource),
+        })));
+        continue;
       }
+      lastError = new Error("获取数据失败");
     } catch (error) {
       lastError = error;
       console.error(`请求 ${source.server} 失败:`, error);
     }
   }
 
-  if (hasSuccessfulResponse) {
-    return { episodes: allEpisodes };
-  }
-
+  if (hasSuccessfulResponse) return allEpisodes;
   throw lastError || new Error("获取数据失败");
 }
 
 async function getCommentsById(params) {
-  const { server, commentId } = params;
+  const { server, server2, server3, commentId, convertMode, blockKeywords, colorMode, maxCount } = params;
 
   if (commentId) {
+    // 提前初始化词典
+    await initDict(convertMode);
+
     const parsedCommentId = parseDanmuServerId(commentId);
-    const sources = getDanmuRequestSources(server, parsedCommentId.source);
+    const sources = getDanmuRequestSources(getMergedDanmuSources(server, server2, server3), parsedCommentId.source);
     let lastError = null;
 
     for (const source of sources) {
       try {
         const response = await Widget.http.get(
           `${source.server}/api/v2/comment/${parsedCommentId.id}?async=1&withRelated=true&chConvert=1`,
-          {
-            headers: getDanmuHeaders(),
-          }
+          { headers: getDanmuHeaders() }
         );
 
         if (response && response.data) {
           let data = response.data;
           let list = data.comments || [];
+
+          // 自定义处理阶段开始 ===========================
           
-          // ----------------------------------------------------
-          // ✨ 二改逻辑: 拦截并处理弹幕内容
-          // ----------------------------------------------------
-          const { maxCount, blockKeywords, convertMode, colorMode } = params;
+          const blockedList = blockKeywords 
+            ? blockKeywords.split(/[,，]/).map(k => k.trim()).filter(k => k.length > 0) 
+            : [];
 
-          // 1. 弹幕屏蔽词过滤
-          if (blockKeywords) {
-              const blocks = blockKeywords.split(',').map(k => k.trim()).filter(k => k);
-              if (blocks.length > 0) {
-                  list = list.filter(c => {
-                      const text = c.m || "";
-                      return !blocks.some(b => text.includes(b));
-                  });
-              }
-          }
-
-          // 2. 繁简转换
-          if (convertMode && convertMode !== "none") {
-              await initDict(convertMode);
-              if (MEM_DICT) {
+          if (list.length > 0) {
+              // 1. 简繁转换
+              if (convertMode !== "none" && MEM_DICT) {
                   list.forEach(c => {
                       if (c.m) c.m = convertText(c.m);
+                      if (c.message) c.message = convertText(c.message);
                   });
               }
-          }
 
-          // 3. 弹幕数量上限等比例剔除
-          if (maxCount) {
-              const max = parseInt(maxCount);
-              if (!isNaN(max) && max > 0 && list.length > max) {
-                  // 先按时间排序
-                  list.sort((a, b) => {
-                      const timeA = a.p ? parseFloat(a.p.split(',')[0]) : 0;
-                      const timeB = b.p ? parseFloat(b.p.split(',')[0]) : 0;
-                      return timeA - timeB;
-                  });
-
-                  // 随机剔除
-                  const retainRatio = max / list.length;
-                  list = list.filter(() => Math.random() < retainRatio);
-                  
-                  // 兜底截断
-                  if (list.length > max) {
-                      list = list.slice(0, max);
-                  }
-
-                  // 再次按时间排序，确保播放器读取正常
-                  list.sort((a, b) => {
-                      const timeA = a.p ? parseFloat(a.p.split(',')[0]) : 0;
-                      const timeB = b.p ? parseFloat(b.p.split(',')[0]) : 0;
-                      return timeA - timeB;
-                  });
-              }
-          }
-
-          // 4. 颜色重写
-          if (colorMode && colorMode !== "none") {
-              const COLORS = [
-                  16711680, 16776960, 16752384, 16738740, 13445375, 11730943, 11730790
-              ];
-              const COLOR_WHITE = "16777215";
-
-              list.forEach(c => {
-                  if (c.p) {
-                      let parts = c.p.split(',');
-                      if (parts.length >= 3) {
-                          // Dandanplay p参数: time,mode,color,userid
-                          // 老版本可能有8个参数，兼容处理一下
-                          let colorIndex = parts.length >= 8 ? 3 : 2; 
-
-                          let targetColor = COLOR_WHITE;
-                          if (colorMode === "white") {
-                              targetColor = COLOR_WHITE;
-                          } else if (colorMode === "partial") {
-                              targetColor = Math.random() < 0.5 
-                                  ? COLORS[Math.floor(Math.random() * COLORS.length)].toString() 
-                                  : COLOR_WHITE;
-                          } else if (colorMode === "all") {
-                              targetColor = COLORS[Math.floor(Math.random() * COLORS.length)].toString();
-                          }
-                          
-                          parts[colorIndex] = targetColor;
-                          c.p = parts.join(',');
+              // 2. 关键词屏蔽
+              if (blockedList.length > 0) {
+                  list = list.filter(c => {
+                      const msg = c.m || c.message || "";
+                      for (const keyword of blockedList) {
+                          if (msg.includes(keyword)) return false; 
                       }
+                      return true;
+                  });
+              }
+
+              // 3. 数量限制与随机剔除
+              let limit = parseInt(maxCount);
+              if (!isNaN(limit) && limit > 0 && list.length > limit) {
+                  for (let i = list.length - 1; i > 0; i--) {
+                      const j = Math.floor(Math.random() * (i + 1));
+                      [list[i], list[j]] = [list[j], list[i]];
                   }
-              });
+                  list = list.slice(0, limit);
+                  list.sort((a, b) => {
+                      let timeA = a.p ? parseFloat(a.p.split(',')[0]) || 0 : 0;
+                      let timeB = b.p ? parseFloat(b.p.split(',')[0]) || 0 : 0;
+                      return timeA - timeB;
+                  });
+              }
+
+              // 4. 颜色重写
+              if (colorMode && colorMode !== "none") {
+                  const COLORS = [16711680, 16776960, 16752384, 16738740, 13445375, 11730943, 11730790];
+                  const COLOR_WHITE = "16777215";
+
+                  list.forEach(c => {
+                      if (c.p) {
+                          let parts = c.p.split(',');
+                          if (parts.length >= 3) {
+                              let colorIndex = parts.length >= 8 ? 3 : 2; 
+                              let targetColor = COLOR_WHITE;
+                              if (colorMode === "white") targetColor = COLOR_WHITE;
+                              else if (colorMode === "partial") {
+                                  targetColor = Math.random() < 0.5 
+                                      ? COLORS[Math.floor(Math.random() * COLORS.length)].toString() 
+                                      : COLOR_WHITE;
+                              } else if (colorMode === "all") {
+                                  targetColor = COLORS[Math.floor(Math.random() * COLORS.length)].toString();
+                              }
+                              parts[colorIndex] = targetColor;
+                              c.p = parts.join(',');
+                          }
+                      }
+                  });
+              }
+              
+              data.comments = list;
           }
-          
-          data.comments = list;
+          // 自定义处理阶段结束 ===========================
+
           return data;
         }
 
@@ -529,49 +596,7 @@ async function getCommentsById(params) {
         console.error(`请求 ${source.server} 失败:`, error);
       }
     }
-
     throw lastError || new Error("获取数据失败");
   }
-
-  // 以下为根据视频参数精准匹配 (旧逻辑备用，但官方推荐优先通过commentId获取)
-  const sources = getDanmuSources(server);
-  const promises = [];
-
-  for (let i = 0; i < sources.length; i += DANMU_SOURCE_BATCH_SIZE) {
-    const batchSources = sources.slice(i, i + DANMU_SOURCE_BATCH_SIZE);
-    const batchPromises = batchSources.map((source) =>
-      (async () => {
-        try {
-          const body = {
-            anime: params.title,
-            episode: params.episodeName,
-            season: params.season,
-            ep: params.episode,
-          };
-          const response = await Widget.http.post(
-            `${source.server}/api/v2/extcomment`,
-            body,
-            { headers: getDanmuHeaders() }
-          );
-          return { source, data: response?.data };
-        } catch (error) {
-          throw Object.assign(error, { source });
-        }
-      })()
-    );
-    promises.push(...batchPromises);
-  }
-
-  const results = await Promise.allSettled(promises);
-
-  for (const result of results) {
-    if (result.status === "fulfilled" && result.value?.data) {
-       // 这里如果触发也可以考虑复用拦截逻辑，不过目前主流靠 commentId
-       return result.value.data;
-    } else if (result.status === "rejected") {
-      console.error(`请求 ${result.reason.source.server} 失败:`, result.reason);
-    }
-  }
-
-  throw new Error("获取数据失败");
+  return null;
 }
