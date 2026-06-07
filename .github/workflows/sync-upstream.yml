@@ -2,7 +2,6 @@ name: Sync Upstream And Open PR
 
 on:
   schedule:
-    # UTC time. This example runs every 6 hours.
     - cron: "23 */6 * * *"
   workflow_dispatch:
 
@@ -12,17 +11,11 @@ permissions:
   issues: write
 
 env:
-  # Final ready-to-use example for MakkaPakka518/FW
   UPSTREAM_REPO: MakkaPakka518/FW
-  # Full-match regex. Keep ".*" to include every upstream branch.
   INCLUDE_BRANCH_REGEX: ".*"
-  # Full-match regex. Leave empty to exclude nothing.
   EXCLUDE_BRANCH_REGEX: ""
-  # Comma-separated labels to apply on the PR. Leave empty to skip.
   PR_LABELS: 上游同步,自动同步
-  # Comma-separated assignees. Leave empty to skip.
   PR_ASSIGNEES: LYDevils
-  # Comma-separated reviewers. Leave empty to skip.
   PR_REVIEWERS: ""
 
 jobs:
@@ -68,13 +61,11 @@ jobs:
                   continue
               if exclude_pattern and exclude_pattern.fullmatch(branch):
                   continue
-              include.append(
-                  {
-                      "upstream_branch": branch,
-                      "target_branch": branch,
-                      "sync_branch": f"sync/upstream/{branch}",
-                  }
-              )
+              include.append({
+                  "upstream_branch": branch,
+                  "target_branch": branch,
+                  "sync_branch": f"sync/upstream/{branch}",
+              })
 
           print(f"branch_count={len(include)}")
           print("matrix=" + json.dumps({"include": include}, ensure_ascii=True))
@@ -149,6 +140,7 @@ jobs:
         if: steps.diff.outputs.has_changes == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
           if [ -n "${PR_LABELS}" ]; then
