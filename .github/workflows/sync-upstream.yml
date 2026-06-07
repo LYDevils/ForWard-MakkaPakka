@@ -9,6 +9,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 env:
   # Final ready-to-use example for MakkaPakka518/FW
